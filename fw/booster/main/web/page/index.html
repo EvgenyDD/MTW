@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>OTA Update</title>
+    <meta charset="utf-8">
+    <script src="index.js"></script>
+</head>
+
+<body>
+    <label id="labelOffline"
+        style="background-color: red;color: whitesmoke; padding-bottom: 2px; display: none;">⚠️Offline⚠️</label>
+    <div id="div_upd" style="padding: 5px; border: 5px double black; background-color: rgb(255, 172, 172);">
+        <label for="otafile">Firmware File:</label>
+        <input type="file" id="otafile" name="otafile" accept=".bin" />
+        <button id="upload" type="button" onclick="startUpload()">Upload</button>
+        <label id="status" for="upload"></label>
+    </div>
+    <br>
+    <div style="margin-left:10px;">
+        <label for="console">Console:</label>
+        <input type="text" id="console" onkeydown="consoleSendEvent(event)" name="console" />
+        <button id="console_send" type="button" onclick="consoleSend()">Send</button>
+    </div>
+    <br>
+    <div id="messageLog" style="height: 90vh; overflow:scroll; color:black; background-color: rgb(221, 221, 221);">
+    </div>
+</body>
+
+</html>

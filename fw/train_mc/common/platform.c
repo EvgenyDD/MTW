@@ -143,7 +143,6 @@ void platform_get_uid(uint32_t *id)
 
 void platform_watchdog_init(void)
 {
-	return; /// HERE
 	IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);
 	IWDG_SetPrescaler(IWDG_Prescaler_256);
 	IWDG_SetReload(10000 /*time_ms*/ / 8);
@@ -186,6 +185,7 @@ void platform_deinit(void)
 void platform_init_loader(void)
 {
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB | RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOD, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
 
 	GPIO_InitTypeDef GPIO_InitStructure = {0};
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;

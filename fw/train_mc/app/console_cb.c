@@ -1,15 +1,11 @@
 #include "adc.h"
 #include "config_system.h"
 #include "console.h"
-#include "drive_hal.h"
+#include "drive.h"
 #include "fw_header.h"
 #include "graph.h"
 #include "platform.h"
 #include <stdio.h>
-
-extern uint8_t pending_can_node_id;
-
-extern uint32_t special_counter, so;
 
 static void info_cb(const char *req, int len, int *ret)
 {
@@ -26,6 +22,9 @@ static void info_cb(const char *req, int len, int *ret)
 	}
 	_console_print("UID: x%08lx.x%08lx.x%08lx\n", g_uid[0], g_uid[1], g_uid[2]);
 	_console_print("Time: %ld\n", system_time_ms);
+	_console_print("TIM1 ARR: %ld\n", TIM1->ARR);
+	_console_print("kp ki: %.9f %.9f\n", ctrl.foc.i_reg.kp, ctrl.foc.i_reg.ki);
+	_console_print("DT: %.9f\n", ctrl.pwm_dt);
 }
 
 static void save_cb(const char *req, int len, int *ret)
@@ -36,9 +35,14 @@ static void save_cb(const char *req, int len, int *ret)
 
 static void adc_cb(const char *req, int len, int *ret)
 {
-	_console_print("I: %.4f %.4f %d %d\n", g_adc_val.i[0], g_adc_val.i[1], g_adc_val.i_raw[0], g_adc_val.i_raw[1]);
+	_console_print("I: %.4f %.4f [%d %d]\n", g_adc_val.i[0], g_adc_val.i[1], g_adc_val.i_raw[0], g_adc_val.i_raw[1]);
 	_console_print("Ub: %.2f\n", g_adc_val.ub);
 	_console_print("Tm: %.1f Tinv: %.1f Tcpu: %.1f\n", g_adc_val.tmtr, g_adc_val.tinv, g_adc_val.tcpu);
+
+	for(uint8_t i = 0; i < ADC_CH_COUNT; i++)
+	{
+		_console_print("%d: %d\n", i, g_adc_buffer[i]);
+	}
 }
 
 const console_cmd_t console_cmd[] = {

@@ -6,6 +6,9 @@
 #define NTC_RES_LO_SIDE(adc_val) ((adc_val * 10000.0f) / (4095 - adc_val))
 #define NTC_TEMP_LO_SIDE(adc_raw, coef) (1.0f / ((logf_fast(NTC_RES_LO_SIDE(adc_raw) / 10000.0f) / coef) + (1.0 / 298.15f)) - 273.15f)
 
+volatile uint16_t g_adc_buffer[ADC_CH_COUNT] = {0};
+volatile adc_val_t g_adc_val = {0};
+
 static float adcVREFINTCAL, adcTSCAL1, adcTSSlopeK;
 
 static inline int __float_as_int(float in)
@@ -111,8 +114,8 @@ void adc_conv_val(void)
 	g_adc_val.i_raw[0] = g_adc_buffer[ADC_CH_I1];
 	g_adc_val.i_raw[1] = g_adc_buffer[ADC_CH_I2];
 
-	g_adc_val.i[1] = (float)g_adc_buffer[ADC_CH_I1] * ADC_I_SCALE - 2048;
-	g_adc_val.i[2] = (float)g_adc_buffer[ADC_CH_I2] * ADC_I_SCALE - 2048;
+	g_adc_val.i[0] = (float)(g_adc_buffer[ADC_CH_I1] - 2048) * ADC_I_SCALE;
+	g_adc_val.i[1] = (float)(g_adc_buffer[ADC_CH_I2] - 2048) * ADC_I_SCALE;
 	g_adc_val.ub = (float)g_adc_buffer[ADC_CH_UB] * ADC_UB_SCALE;
 
 	g_adc_val.tmtr = NTC_TEMP_LO_SIDE(g_adc_buffer[ADC_CH_TEMP_MTR], NTC_COEF);

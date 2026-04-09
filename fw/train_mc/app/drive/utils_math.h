@@ -65,6 +65,7 @@ float utils_batt_liion_norm_v_to_capacity(float norm_v);
 #endif
 
 #define CLIP(a, l, h) (MAX((MIN((a), (h))), (l)))
+#define CLIPS(a, v) CLIP((a), -(v), (v))
 
 // For double precision literals
 #define D(x) ((double)x##L)

@@ -11,19 +11,6 @@
 
 #define ONE_BY_SQRT3 (0.57735026919)
 
-#define CLARKE_MACRO(i1, i2, iA, iB) \
-	(iA) = (i1);                     \
-	(iB) = ((i1) + ((i2) * 2.0f)) * ONE_BY_SQRT3;
-
-#define PARK_MACRO(iA, iB, angle, iD, iQ)              \
-	utils_fast_sincos_better(angle, &_sine, &_cosine); \
-	(iD) = (iB) * _sine + (iA) * _cosine;              \
-	(iQ) = (iB) * _cosine - (iA) * _sine;
-
-#define IPARK_MACRO(uD, uQ, uA, uB)       \
-	(uA) = (uD) * _cosine - (uQ) * _sine; \
-	(uB) = (uD) * _sine + (uQ) * _cosine;
-
 #define SVGENDQ_MACRO(uA, uB, T)                                \
 	float tmp1 = (uB), tmp2 = (uB) * 0.5 + (SQRT3_BY_2 * (uA)); \
 	float tmp3 = tmp2 - tmp1;                                   \
@@ -52,51 +39,52 @@ typedef struct
 	float id_fb, iq_fb;
 	float ia, ib;
 	float u_ph[3];
-	float pwm[3];
+	float pwm[3]; // -1.0 ... 1.0
 
 	bool was_foc_ctrl; // prev ctrl mode was FOC ctrl
 } foc_ctrl_t;
 
-static inline void foc(foc_ctrl_t *foc,
-					   bool is_foc,
-					   float dt,
-					   float freq,
-					   const float vb,
-					   float iq,
-					   float id,
-					   const float velElectricalRad,
-					   const float ref_angle, // rad
-					   const float iu,
-					   const float iv,
-					   const float i_comp)
+static inline void foc_mon(volatile foc_ctrl_t *foc)
 {
-	if(is_foc)
-	{
-		float _cosine, _sine;
-		CLARKE_MACRO(iu, iv, foc->ia, foc->ib);
-		PARK_MACRO(foc->ia, foc->ib, ref_angle, foc->id_fb, foc->iq_fb);
+	if(foc->was_foc_ctrl) CplxPiRegReset(&foc->i_reg);
+	foc->was_foc_ctrl = false;
+}
 
-		CplxPiRegSetLimit(&foc->i_reg, -vb * MAX_DUTY, vb * MAX_DUTY);
-		CplxPiRegUpdate(&foc->i_reg,
-						id, iq + i_comp,
-						foc->id_fb, foc->iq_fb,
-						0, 0,
-						-velElectricalRad,
-						dt,
-						&foc->ud, &foc->uq);
+static inline void foc_calc(volatile foc_ctrl_t *foc,
+							float dt,
+							float ub,
+							float iu, float iv,
+							float iq, float id, float iq_comp,
+							float we,		 // electrical velocity
+							float ref_angle) // angle rad
+{
+	foc->ia = iu;
+	foc->ib = (iu + (iv * 2.0f)) * ONE_BY_SQRT3;
 
-		IPARK_MACRO(foc->ud, foc->uq, foc->ua, foc->ub);
-		SVGENDQ_MACRO(foc->ua, foc->ub, foc->u_ph);
+	float _cosine, _sine;
+	utils_fast_sincos_better(ref_angle, &_sine, &_cosine);
 
-		foc->pwm[0] = foc->u_ph[0] / vb;
-		foc->pwm[1] = foc->u_ph[1] / vb;
-		foc->pwm[2] = foc->u_ph[2] / vb;
-	}
-	else
-	{
-		if(foc->was_foc_ctrl != is_foc) CplxPiRegReset(&foc->i_reg);
-	}
-	foc->was_foc_ctrl = is_foc;
+	foc->id_fb = foc->ib * _sine + foc->ia * _cosine;
+	foc->iq_fb = foc->ib * _cosine - foc->ia * _sine;
+
+	CplxPiRegUpdate(&foc->i_reg, ub * MAX_DUTY,
+					id, iq + iq_comp,
+					foc->id_fb, foc->iq_fb,
+					0, 0,
+					-we, dt);
+
+	foc->ud = foc->i_reg.out_d;
+	foc->uq = foc->i_reg.out_q;
+
+	foc->ua = foc->ud * _cosine - foc->uq * _sine;
+	foc->ub = foc->ud * _sine + foc->uq * _cosine;
+
+	SVGENDQ_MACRO(foc->ua, foc->ub, foc->u_ph);
+
+	foc->pwm[0] = foc->u_ph[0] / ub;
+	foc->pwm[1] = foc->u_ph[1] / ub;
+	foc->pwm[2] = foc->u_ph[2] / ub;
+	foc->was_foc_ctrl = true;
 }
 
 #endif // FOC_H__

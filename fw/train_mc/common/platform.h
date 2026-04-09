@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define GR_POOL_SZ 116 * 1024
+#define GR_POOL_SZ (116 * 1024)
 
 #define _BV(x) (1ULL << (x))
 
@@ -17,11 +17,15 @@
 #define FLASH_FINISH (FLASH_BASE + FLASH_LEN)
 #define FLASH_SIZE FLASH_LEN
 
-#define PIN_SET(x) x##_GPIO_Port->BSRR = x##_Pin
-#define PIN_CLR(x) x##_GPIO_Port->BSRR = ((uint32_t)(x##_Pin)) << 16
-#define PIN_WR(x, v) x##_GPIO_Port->BSRR = ((uint32_t)(x##_Pin)) << ((!(v)) * 16)
-#define PIN_GET(x) !!(x##_GPIO_Port->IDR & x##_Pin)
-#define PIN_GET_ODR(x) !!(x##_GPIO_Port->ODR & x##_Pin)
+#define PIN_SET_(x, y) (x)->BSRRL = (y)
+#define PIN_RST_(x, y) (x)->BSRRH = (y)
+#define PIN_GET_(x, y) !!((x)->IDR & (y))
+#define PIN_GET_ODR_(x, y) !!((x)->ODR & (y))
+
+#define PIN_SET(x) x##_Port->BSRRL = x##_Pin
+#define PIN_RST(x) x##_Port->BSRRH = x##_Pin
+#define PIN_GET(x) !!(x##_Port->IDR & x##_Pin)
+#define PIN_GET_ODR(x) !!(x##_Port->ODR & x##_Pin)
 
 #define UNIQUE_ID 0x1FFF7A10
 
@@ -49,6 +53,11 @@ static inline void platform_watchdog_reset(void) { IWDG_ReloadCounter(); }
 const char *platform_reset_cause_get(void);
 
 uint32_t platform_get_loop_freq(void);
+
+void EXTI4_IRQHandler(void);
+void EXTI9_5_IRQHandler(void);
+void TIM3_IRQHandler(void);
+void DMA1_Stream3_IRQHandler(void);
 
 extern int __preldr_start, __preldr_end;
 extern int __ldr_start, __ldr_end;

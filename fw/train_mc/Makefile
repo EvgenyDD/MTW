@@ -1,7 +1,7 @@
 EXE_NAME=rwmc
 VER_MAJ =   1
 VER_MIN =   0
-VER_PATCH = 2
+VER_PATCH = 0
 MAKE_BINARY=yes
 
 TCHAIN = arm-none-eabi-
@@ -29,14 +29,13 @@ LDFLAGS  += -Wl,--print-memory-usage -Wl,-u,_scanf_float
 
 EXT_LIBS +=c m nosys
 
-PPDEFS += USE_STDPERIPH_DRIVER STM32F40_41xxx STM32F407xx HSE_VALUE=12000000 FW_TYPE=FW_APP CFG_SYSTEM_SAVES_NON_NATIVE_DATA=1 DEV=\"RWMC\"
+PPDEFS += USE_STDPERIPH_DRIVER STM32F40_41xxx STM32F407xx HSE_VALUE=8000000 FW_TYPE=FW_APP CFG_SYSTEM_SAVES_NON_NATIVE_DATA=1 DEV=\"RWMC\"
 PPDEFS += USBD_CLASS_COMPOSITE_DFU_CDC
 PPDEFS += DFU_READS_CFG_SECTION
 
 INCDIR += app
 INCDIR += app/drive
 INCDIR += common
-INCDIR += common/adc
 INCDIR += common/CMSIS
 INCDIR += common/config_system
 INCDIR += common/console
@@ -121,6 +120,8 @@ flash_all: $(BINARY_MERGED)
 
 program: $(BINARY_SIGNED)
 	@usb_dfu_flasher w a $< RWMC
+
+p: program
 
 ds:
 	@openocd -d0 -f target/stm32f4xx.cfg

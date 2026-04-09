@@ -7,8 +7,8 @@
 #define TS_CAL1_ADDR 0x1FFF7A2C
 #define TS_CAL2_ADDR 0x1FFF7A2E
 
-#define ADC_I_SCALE ((3.3f / 4095.0f) / (50.0f * 0.01f))
-#define ADC_UB_SCALE ((3.3f / 4095.0f) * (1.0f + 30.0f / 4.7f))
+#define ADC_I_SCALE ((3.3f / 4095.0f) / (10.0f * 0.02f))
+#define ADC_UB_SCALE ((3.3f / 4095.0f) * (1.0f + 39.0f / 3.3f))
 
 enum
 {

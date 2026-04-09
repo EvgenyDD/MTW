@@ -2,11 +2,12 @@
 #include "platform.h"
 #include <string.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
+
 #define MIN(a, b) ((a) <= (b) ? (a) : (b))
 
-static uint8_t pool[GR_POOL_SZ];
-
-static struct
+static volatile struct
 {
 	uint32_t samples_bg;
 	uint32_t samples_fg;
@@ -17,10 +18,11 @@ static struct
 	uint32_t decimation;
 } set = {0};
 
-static uint8_t state = GR_ST_OFF; // GR_ST_*
-static uint32_t prev_sys_state = 0, prev_sys_err = 0, decimation_cnt = 0;
-static uint32_t samples_bg_collect = 0, samples_fg_collect = 0;
-static uint32_t ptr_start = 0, ptr_cur = 0; // raw bytes
+static volatile uint8_t pool[GR_POOL_SZ];
+static volatile uint8_t state = GR_ST_OFF; // GR_ST_*
+static volatile uint32_t prev_sys_state = 0, prev_sys_err = 0, decimation_cnt = 0;
+static volatile uint32_t samples_bg_collect = 0, samples_fg_collect = 0;
+static volatile uint32_t ptr_start = 0, ptr_cur = 0; // raw bytes
 
 static uint32_t vtype2sz[] = {0, 1, 1, 2, 4, 1, 2, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 0, 0, 8};
 
@@ -251,7 +253,7 @@ void gr_cb(const uint8_t *req, uint32_t req_len, uint8_t *resp, uint32_t *resp_l
 					resp[1] = GR_ERR_PARAM;
 					return;
 				}
-				set.vars[i] = &gr_vars[req[14] + i];
+				set.vars[i] = &gr_vars[req[14 + i]];
 
 				set.sample_size += set.vars[i]->getter
 									   ? set.vars[i]->size
@@ -357,16 +359,16 @@ void gr_cb(const uint8_t *req, uint32_t req_len, uint8_t *resp, uint32_t *resp_l
 			uint32_t p = 5;
 			if(ptr_start + off + sz >= lim)
 			{
-				uint32_t sz_from_0 = sz;
+				uint32_t sz_from_0 = sz, to_copy = 0;
 				if(ptr_start + off < lim)
 				{
-					uint32_t to_copy = lim - (ptr_start + off);
+					to_copy = lim - (ptr_start + off);
 					if(to_copy > sz) to_copy = sz;
 					if(to_copy) memcpy(&resp[p], &pool[ptr_start + off], to_copy);
 					p += to_copy;
 					sz_from_0 -= to_copy;
 				}
-				if(sz) memcpy(&resp[p], &pool[0], sz_from_0);
+				if(sz) memcpy(&resp[p], &pool[off - lim + ptr_start + to_copy], sz_from_0);
 			}
 			else
 			{
@@ -391,3 +393,4 @@ void gr_cb(const uint8_t *req, uint32_t req_len, uint8_t *resp, uint32_t *resp_l
 	default: *resp_len = 0; break;
 	}
 }
+#pragma GCC diagnostic pop

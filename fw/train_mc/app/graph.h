@@ -74,7 +74,8 @@ void gr_set_state(uint32_t system_state, uint32_t err);
 void gr_poll(void);
 void gr_cb(const uint8_t *req, uint32_t req_len, uint8_t *resp, uint32_t *resp_len);
 
-extern void gr_cb_init(void);
+extern void gr_wr_cb(const void *buf, size_t count);
+extern int gr_rd_cb(void *buf, size_t *sz);
 
 extern gr_var_t gr_vars[];
 extern const uint32_t gr_vars_size;

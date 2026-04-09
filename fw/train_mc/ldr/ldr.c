@@ -61,9 +61,7 @@ void main(void)
 	{
 		uint32_t time_diff_systick = (uint32_t)prof_mark(&prev_systick);
 
-		static uint32_t remain_systick_us_prev = 0, remain_systick_ms_prev = 0;
-		uint32_t diff_us = (time_diff_systick + remain_systick_us_prev) / (SYSTICK_IN_US);
-		remain_systick_us_prev = (time_diff_systick + remain_systick_us_prev) % SYSTICK_IN_US;
+		static uint32_t remain_systick_ms_prev = 0;
 
 		uint32_t diff_ms = (time_diff_systick + remain_systick_ms_prev) / (SYSTICK_IN_MS);
 		remain_systick_ms_prev = (time_diff_systick + remain_systick_ms_prev) % SYSTICK_IN_MS;
@@ -80,7 +78,5 @@ void main(void)
 		boot_delay = boot_delay >= diff_ms ? boot_delay - diff_ms : 0;
 
 		usb_poll(diff_ms);
-
-		platform_reset();
 	}
 }
