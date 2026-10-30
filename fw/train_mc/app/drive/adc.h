@@ -12,8 +12,8 @@
 
 enum
 {
-	ADC_CH_I2 = 0,	 // 1 - ch 8
-	ADC_CH_I1,		 // 2 - ch 9
+	ADC_CH_I1 = 0,	 // 1 - ch 8
+	ADC_CH_I0,		 // 2 - ch 9
 	ADC_CH_TEMP_INV, // 3 - ch 10
 
 	ADC_CH_TEMP_CPU, // 1 - ch 16
@@ -24,17 +24,21 @@ enum
 	ADC_CH_7,	   // 2 - none
 	ADC_CH_8,	   // 3 - none
 
+	ADC_CH_HALL0, // 1 - ch 6
+	ADC_CH_HALL1, // 2 - ch 7
+	ADC_CH_11,	  // 3 - none
+
 	ADC_CH_COUNT,
 };
 
 typedef struct
 {
-	uint16_t i_raw[2];
 	float i[2];
 	float ub;
 	float tmtr;
 	float tinv;
 	float tcpu;
+	uint16_t hall_raw[2];
 } adc_val_t;
 
 void adc_init(void);

@@ -27,7 +27,7 @@ float utils_fast_atan2(float y, float x);
 float utils_fast_sin(float angle);
 float utils_fast_cos(float angle);
 void utils_fast_sincos(float angle, float *sin, float *cos);
-void utils_fast_sincos_better(float angle, float *sin, float *cos);
+void utils_fast_sincos_better(float angle, volatile float *sin, volatile float *cos);
 float utils_min_abs(float va, float vb);
 float utils_max_abs(float va, float vb);
 void utils_byte_to_binary(int x, char *b);
@@ -160,16 +160,21 @@ static inline void utils_norm_angle(float *angle)
  * The angle to normalize in radians.
  * WARNING: Don't use too large angles.
  */
-static inline void utils_norm_angle_rad(float *angle)
+// static inline void utils_norm_angle_rad(float angle)
+// {
+// 	while(angle < -M_PI)
+// 	{
+// 		angle += 2.0 * M_PI;
+// 	}
+// 	while(angle >= M_PI)
+// 	{
+// 		angle -= 2.0 * M_PI;
+// 	}
+// 	return angle;
+// }
+static inline float utils_norm_angle_rad(float angle)
 {
-	while(*angle < -M_PI)
-	{
-		*angle += 2.0 * M_PI;
-	}
-	while(*angle >= M_PI)
-	{
-		*angle -= 2.0 * M_PI;
-	}
+	return remainderf(angle, 2.0f * (float)M_PI);
 }
 
 static inline void utils_truncate_number(float *number, float min, float max)
@@ -300,5 +305,7 @@ static inline bool utils_saturate_vvector_2d(volatile float *x, volatile float *
 
 	return retval;
 }
+
+float _isqrt_q3a_(float number);
 
 #endif /* UTILS_MATH_H_ */

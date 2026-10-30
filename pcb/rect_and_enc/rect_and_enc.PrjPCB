@@ -140,12 +140,12 @@ GenerateClassCluster=0
 DocumentUniqueId=SUUDXNVD
 
 [Parameter1]
-Name=PRJ_ID
-Value=05-03
+Name=PRJ_VER
+Value=v1.0.0
 
 [Parameter2]
-Name=PRJ_VER
-Value=v2.1.1
+Name=PRJ_ID
+Value=Rectifier
 
 [Configuration1]
 Name=Sources

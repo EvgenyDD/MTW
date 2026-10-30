@@ -3,11 +3,13 @@
 
 #include "stm32f4xx.h"
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
-#define GR_POOL_SZ (116 * 1024)
+#define SYSTICK_IN_US (168000000 / 1000000)
+#define SYSTICK_IN_MS (168000000 / 1000)
 
-#define _BV(x) (1ULL << (x))
+#define GR_POOL_SZ (112 * 1024)
 
 #define PAGE_SIZE (2 * 1024)
 
@@ -39,6 +41,7 @@ void platform_flash_lock(void);
 int platform_flash_read(uint32_t addr, uint8_t *src, uint32_t sz);
 int platform_flash_write(uint32_t dest, const uint8_t *src, uint32_t sz);
 
+void platform_make_safe(void);
 void platform_deinit(void);
 void platform_reset(void);
 void platform_run_address(uint32_t address);
@@ -54,10 +57,7 @@ const char *platform_reset_cause_get(void);
 
 uint32_t platform_get_loop_freq(void);
 
-void EXTI4_IRQHandler(void);
-void EXTI9_5_IRQHandler(void);
-void TIM3_IRQHandler(void);
-void DMA1_Stream3_IRQHandler(void);
+void memcpy_volatile(volatile void *dst, const volatile void *src, size_t size);
 
 extern int __preldr_start, __preldr_end;
 extern int __ldr_start, __ldr_end;

@@ -20,7 +20,10 @@ gr_var_t gr_vars[] = {
 	{V_S(ctrl.foc.ud), GR_TYPE_REAL32, GR_TYPE_REAL32, 1000.0f, "ud", NULL},
 	{V_S(ctrl.foc.uq), GR_TYPE_REAL32, GR_TYPE_REAL32, 1000.0f, "uq", NULL},
 
+	{V_S(g_adc_val.hall_raw[0]), GR_TYPE_UINT16, GR_TYPE_UINT16, 1.0f, "H0", NULL},
+	{V_S(g_adc_val.hall_raw[1]), GR_TYPE_UINT16, GR_TYPE_UINT16, 1.0f, "H1", NULL},
 	{V_S(ctrl.angle_enc), GR_TYPE_REAL32, GR_TYPE_REAL32, 1.0f, "Ae", NULL},
+	{V_S(ctrl.angle_foc), GR_TYPE_REAL32, GR_TYPE_REAL32, 1.0f, "Af", NULL},
 	{V_S(ctrl.angle_sim), GR_TYPE_REAL32, GR_TYPE_REAL32, 1.0f, "As", NULL},
 	{V_S(ctrl.foc.pwm[0]), GR_TYPE_REAL32, GR_TYPE_REAL32, 1.0f, "Uo0", NULL},
 	{V_S(ctrl.foc.pwm[1]), GR_TYPE_REAL32, GR_TYPE_REAL32, 1.0f, "Uo1", NULL},

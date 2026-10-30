@@ -3,9 +3,12 @@
 #include "config_system.h"
 #include "console.h"
 #include "crc.h"
+#include "dcc.h"
 #include "drive.h"
 #include "fw_header.h"
 #include "graph.h"
+#include "i2c_common.h"
+#include "led_drv.h"
 #include "platform.h"
 #include "prof.h"
 #include "proto.h"
@@ -16,23 +19,23 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SYSTICK_IN_US (168000000 / 1000000)
-#define SYSTICK_IN_MS (168000000 / 1000)
-
 bool g_stay_in_boot = false;
 uint32_t g_uid[3];
-
 volatile uint32_t system_time_ms = 0;
+uint8_t g_dcc_self_id = DCC_SELF_ID;
+
 static int32_t prev_systick = 0;
 
-uint8_t txBuffer[256] = "abcd"; // Larger buffer for variable size data
-volatile uint8_t dmaBusy = 0;	// Flag to indicate DMA is busy
-
-static uint8_t dummy = 0;
-
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
 config_entry_t g_device_config[] = {
-	{"dummy", sizeof(dummy), 0, &dummy},
+	{"dcc_id", sizeof(g_dcc_self_id), 0, &g_dcc_self_id},
+	{"cal_hall", 2 * sizeof(hall_calib_t), 0, &ctrl.hall_cal[0]},
+	{"cal_dir", sizeof(g_dir), 0, &g_dir},
+	{"cal_pp", sizeof(ctrl.pp), 0, &ctrl.pp},
+	{"cal_off", sizeof(ctrl.hall), 0, &ctrl.pp},
 };
+#pragma GCC diagnostic pop
 const uint32_t g_device_config_count = sizeof(g_device_config) / sizeof(g_device_config[0]);
 
 void delay_ms(volatile uint32_t delay_ms)
@@ -48,62 +51,7 @@ void delay_ms(volatile uint32_t delay_ms)
 	}
 }
 
-static void trigger_send(uint8_t *data, uint16_t size)
-{
-	DMA_Cmd(DMA1_Stream3, DISABLE);
-	while(DMA_GetCmdStatus(DMA1_Stream3) == ENABLE)
-		;
-	DMA_SetCurrDataCounter(DMA1_Stream3, size);
-	DMA_MemoryTargetConfig(DMA1_Stream3, (uint32_t)data, DMA_Memory_0);
-	DMA_ClearFlag(DMA1_Stream3, DMA_FLAG_TCIF3 | DMA_FLAG_FEIF3 | DMA_FLAG_DMEIF3 | DMA_FLAG_TEIF3 | DMA_FLAG_HTIF3);
-	DMA_Cmd(DMA1_Stream3, ENABLE);
-}
-
-void EXTI4_IRQHandler(void)
-{
-	if(EXTI_GetITStatus(EXTI_Line4) != RESET)
-	{
-		TIM_Cmd(TIM3, DISABLE);
-		TIM_SetCounter(TIM3, 0);
-		TIM_Cmd(TIM3, ENABLE);
-		EXTI_ClearITPendingBit(EXTI_Line4);
-	}
-}
-
-void EXTI9_5_IRQHandler(void)
-{
-	if(EXTI_GetITStatus(EXTI_Line5) != RESET)
-	{
-		TIM_Cmd(TIM3, DISABLE);
-		TIM_SetCounter(TIM3, 0);
-		TIM_Cmd(TIM3, ENABLE);
-		EXTI_ClearITPendingBit(EXTI_Line5);
-	}
-}
-
-static uint8_t text[16] = {"012"};
-void TIM3_IRQHandler(void)
-{
-	if(TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
-	{
-		TIM_Cmd(TIM3, DISABLE);
-		if((GPIOA->IDR & (1 << 4)) == 0 &&
-		   (GPIOA->IDR & (1 << 5)) == 0)
-		{
-			// if(++text[0] > '9') text[0] = '0';
-			trigger_send(text, 3);
-		}
-		TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
-	}
-}
-
-void DMA1_Stream3_IRQHandler(void)
-{
-	if(DMA_GetITStatus(DMA1_Stream3, DMA_IT_TCIF3))
-	{
-		DMA_ClearITPendingBit(DMA1_Stream3, DMA_IT_TCIF3);
-	}
-}
+uint8_t arr_i2c[256] = {0};
 
 void main(void)
 {
@@ -114,117 +62,40 @@ void main(void)
 	prof_init();
 	platform_watchdog_init();
 
-	drv_init();
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
 
 	fw_header_check_all();
 
 	ret_mem_init();
 	ret_mem_set_load_src(LOAD_SRC_APP); // let preboot know it was booted from app
 
+	drv_init();
+	dcc_hw_init();
 	usb_init();
 
-	{
-		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-		RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
-		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1, ENABLE);
+	GPIO_InitTypeDef GPIO_InitStructure = {0};
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_12; // DBG
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-		GPIO_InitTypeDef GPIO_InitStruct;
-		GPIO_InitStruct.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
-		GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN;
-		GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
-		GPIO_Init(GPIOA, &GPIO_InitStruct);
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7; // DBG
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-		SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA, EXTI_PinSource4);
-		SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA, EXTI_PinSource5);
+	int err = config_validate();
+	if(err == CONFIG_STS_OK) config_read_storage();
 
-		EXTI_InitTypeDef EXTI_InitStruct;
-		EXTI_InitStruct.EXTI_Line = EXTI_Line4;
-		EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
-		EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Falling;
-		EXTI_InitStruct.EXTI_LineCmd = ENABLE;
-		EXTI_Init(&EXTI_InitStruct);
+	i2c_init();
+	led_drv_init();
 
-		EXTI_InitStruct.EXTI_Line = EXTI_Line5;
-		EXTI_Init(&EXTI_InitStruct);
+	led_drv_set_led(LED_MARK_FRONT_L_RD, LED_MODE_SFLASH_SINGLE);
+	led_drv_set_led(LED_MARK_FRONT_R_RD, LED_MODE_SFLASH_SINGLE);
+	led_drv_set_led(LED_MARK_REAR_L_RD, LED_MODE_SFLASH_SINGLE);
+	led_drv_set_led(LED_MARK_REAR_R_RD, LED_MODE_SFLASH_SINGLE);
 
-		NVIC_InitTypeDef NVIC_InitStruct;
-		NVIC_InitStruct.NVIC_IRQChannel = EXTI4_IRQn;
-		NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0;
-		NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
-		NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-		NVIC_Init(&NVIC_InitStruct);
-
-		NVIC_InitStruct.NVIC_IRQChannel = EXTI9_5_IRQn;
-		NVIC_Init(&NVIC_InitStruct);
-
-		TIM_TimeBaseInitTypeDef TIM_TimeBaseStruct;
-		TIM_TimeBaseStruct.TIM_Prescaler = 84 - 1;
-		TIM_TimeBaseStruct.TIM_CounterMode = TIM_CounterMode_Up;
-		TIM_TimeBaseStruct.TIM_Period = 20 - 1;
-		TIM_TimeBaseStruct.TIM_ClockDivision = 0;
-		TIM_TimeBaseStruct.TIM_RepetitionCounter = 0;
-		TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStruct);
-
-		TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
-
-		NVIC_InitStruct.NVIC_IRQChannel = TIM3_IRQn;
-		NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
-		NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
-		NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-		NVIC_Init(&NVIC_InitStruct);
-
-		TIM_Cmd(TIM3, DISABLE);
-
-		GPIO_InitStruct.GPIO_Pin = GPIO_Pin_10;
-		// GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT;
-		GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;
-		GPIO_InitStruct.GPIO_Speed = GPIO_Speed_100MHz;
-		GPIO_InitStruct.GPIO_OType = GPIO_OType_OD;
-		GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
-		GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-		GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_USART3);
-
-		USART_InitTypeDef USART_InitStructure;
-		USART_InitStructure.USART_BaudRate = 250000;
-		USART_InitStructure.USART_WordLength = USART_WordLength_8b;
-		USART_InitStructure.USART_StopBits = USART_StopBits_1;
-		USART_InitStructure.USART_Parity = USART_Parity_No;
-		USART_InitStructure.USART_Mode = USART_Mode_Tx;
-		USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-		USART_Init(USART3, &USART_InitStructure);
-
-		USART_DMACmd(USART3, USART_DMAReq_Tx, ENABLE);
-		USART_Cmd(USART3, ENABLE);
-
-		DMA_DeInit(DMA1_Stream3);
-
-		DMA_InitTypeDef DMA_InitStructure;
-		DMA_InitStructure.DMA_Channel = DMA_Channel_4; // USART3_TX uses channel 4
-		DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART3->DR;
-		DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)txBuffer;
-		DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
-		DMA_InitStructure.DMA_BufferSize = 1;
-		DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-		DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-		DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-		DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
-		DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
-		DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-		DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
-		DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
-		DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
-		DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-		DMA_Init(DMA1_Stream3, &DMA_InitStructure);
-
-		// DMA_ITConfig(DMA1_Stream3, DMA_IT_TC, ENABLE);
-
-		// NVIC_InitStruct.NVIC_IRQChannel = DMA1_Stream3_IRQn;
-		// NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0;
-		// NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
-		// NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-		// NVIC_Init(&NVIC_InitStruct);
-	}
+	led_drv_set_led_manual(LED_HEADLIGHT_FRONT, LED_BR_MIN);
+	led_drv_set_led_manual(LED_HEADLIGHT_REAR, LED_BR_MIN);
 
 	prof_mark(&prev_systick);
 	for(;;)
@@ -244,6 +115,71 @@ void main(void)
 		platform_watchdog_reset();
 
 		usb_poll(diff_ms);
+		dcc_dc_poll();
+
+		led_drv_poll(diff_ms);
+
+#if 0
+		static uint32_t t1 = 0, t2 = 0;
+		t1 += diff_ms;
+		if(t1 >= 1500)
+		{
+			t1 = 0;
+#if 1
+			t2++;
+			if(t2 >= 13)
+			{
+				t2 = 0;
+				for(uint32_t i = 0; i < 12; i++)
+				{
+					i2c_mem_write(0xB6, 0x20 + i, false, (uint8_t[]){1}, 1);
+				}
+			}
+			{
+				if(t2 > 0) i2c_mem_write(0xB6, 0x20 - 1 + t2, false, (uint8_t[]){255}, 1);
+				if(t2 > 1) i2c_mem_write(0xB6, 0x20 - 2 + t2, false, (uint8_t[]){1}, 1);
+			}
+#else
+			t2++;
+			if(t2 >= 2)
+			{
+				t2 = 0;
+			}
+			if(t2 == 0)
+			{
+				for(uint32_t i = 2; i < 10; i++)
+				{
+					i2c_mem_write(0xB6, 0x20 + i, false, (uint8_t[]){100}, 1);
+				}
+
+				for(uint32_t i = 0; i < 2; i++)
+				{
+					i2c_mem_write(0xB6, 0x20 + i, false, (uint8_t[]){1}, 1);
+				}
+				for(uint32_t i = 10; i < 12; i++)
+				{
+					i2c_mem_write(0xB6, 0x20 + i, false, (uint8_t[]){1}, 1);
+				}
+			}
+			else
+			{
+				for(uint32_t i = 2; i < 10; i++)
+				{
+					i2c_mem_write(0xB6, 0x20 + i, false, (uint8_t[]){0}, 1);
+				}
+
+				for(uint32_t i = 0; i < 2; i++)
+				{
+					i2c_mem_write(0xB6, 0x20 + i, false, (uint8_t[]){250}, 1);
+				}
+				for(uint32_t i = 10; i < 12; i++)
+				{
+					i2c_mem_write(0xB6, 0x20 + i, false, (uint8_t[]){250}, 1);
+				}
+			}
+#endif
+		}
+#endif
 	}
 }
 
@@ -281,7 +217,7 @@ static void process_cobs(uint8_t *data, uint32_t size)
 			else if(o.mode == DRV_MODE_OFF)
 				drv_set_off();
 			else if(o.mode == DRV_MODE_OL)
-				drv_set_ol(o.iq, o.pos, o.vel, o.vel_rate);
+				drv_set_ol(o.iq, o.id, o.pos, o.vel, o.vel_rate);
 			else if(o.mode == DRV_MODE_CURRENT)
 				drv_set_cur(o.iq, o.id);
 			else if(o.mode == DRV_MODE_VELOCITY)
@@ -295,14 +231,16 @@ static void process_cobs(uint8_t *data, uint32_t size)
 		in.i.err_mask = ctrl.err;
 		in.i.mode = ctrl.mode;
 		in.i.ub = g_adc_val.ub * 100;
-		in.i.i[0] = ctrl.foc.iq_fb * 1000;
-		in.i.i[1] = ctrl.foc.id_fb * 1000;
+		in.i.i[0] = ctrl.foc.iq_fb_filt * 1000;
+		in.i.i[1] = ctrl.foc.id_fb_filt * 1000;
 		in.i.pwm[0] = TIM1->CCR1;
 		in.i.pwm[1] = TIM1->CCR2;
 		in.i.pwm[2] = TIM1->CCR3;
 		in.i.temp[0] = CLIPS(g_adc_val.tmtr, 127);
 		in.i.temp[1] = CLIPS(g_adc_val.tinv, 127);
 		in.i.temp[2] = CLIPS(g_adc_val.tcpu, 127);
+		in.i.pos = ctrl.angle_enc;
+		in.i.vel = ctrl.rpm;
 		cobs_encode_tx((uint8_t *)&in, sizeof(in));
 		break;
 	}

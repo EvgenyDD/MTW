@@ -77,7 +77,7 @@ static void _led_prc_f2(void) { leds[current_led].brightness = counter_2000 < 20
 static void _led_prc_f3(void) { leds[current_led].brightness = counter_2000 < 200 || (counter_2000 >= 400 && counter_2000 < 600) || (counter_2000 >= 800 && counter_2000 < 1000) ? 1.0f : 0; }
 
 static void _led_prc_sf2_5(void) { leds[current_led].brightness = interval_hit((int32_t)(counter_2000 % 400), 100, half_period_flash, 2000); }
-static void _led_prc_sf1(void) { leds[current_led].brightness = interval_hit((int32_t)(counter_2000 % 400), 100, half_period_flash, 2000); }
+static void _led_prc_sf1(void) { leds[current_led].brightness = interval_hit((int32_t)counter_2000, 100, half_period_flash, 2000); }
 static void _led_prc_sf2(void)
 {
 	float y1 = interval_hit((int32_t)counter_2000, 100, half_period_flash, 2000);

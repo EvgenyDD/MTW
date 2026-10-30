@@ -3,6 +3,10 @@
 #include "ret_mem.h"
 #include <string.h>
 
+#if FW_TYPE == FW_APP
+#include "drive.h"
+#endif
+
 extern void usb_disconnect(void);
 
 typedef void (*pFunction)(void);
@@ -171,8 +175,18 @@ const char *platform_reset_cause_get(void)
 	return reset_src_str;
 }
 
+void platform_make_safe(void)
+{
+#if FW_TYPE == FW_APP
+	drv_set_off();
+	ctrl.err = 0xFFFF;
+	drv_pwm_off();
+#endif
+}
+
 void platform_deinit(void)
 {
+	platform_make_safe();
 	__disable_irq();
 	SysTick->CTRL = 0;
 	for(uint32_t i = 0; i < sizeof(NVIC->ICPR) / sizeof(NVIC->ICPR[0]); i++)
@@ -200,4 +214,12 @@ void platform_init_loader(void)
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
 	GPIOB->BSRRL = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
+}
+
+void memcpy_volatile(volatile void *dst, const volatile void *src, size_t size)
+{
+	for(uint32_t i = 0; i < size; i++)
+	{
+		*((volatile uint8_t *)dst + i) = *((const volatile uint8_t *)src + i);
+	}
 }

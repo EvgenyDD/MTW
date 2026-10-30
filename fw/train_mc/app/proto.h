@@ -76,6 +76,7 @@ static inline const char *err2str(uint8_t bit)
 	case ERR_OV: return "OV";
 	case ERR_UV: return "UV";
 	case ERR_OT: return "OT";
+	case ERR_TO: return "TO";
 	default: return "Undef.";
 	}
 }

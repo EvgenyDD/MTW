@@ -56,11 +56,10 @@ void usb_init(void)
 	usdb_desc_init();
 	USBD_Init(&USB_OTG_dev, USB_OTG_FS_CORE_ID, &usbd_usr_cb, &usb_class_cb, &USR_cb);
 
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
 	NVIC_InitTypeDef NVIC_InitStructure;
 	NVIC_InitStructure.NVIC_IRQChannel = OTG_FS_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 

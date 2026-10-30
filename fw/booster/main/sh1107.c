@@ -259,7 +259,7 @@ void sh1107_char(uint16_t x, uint16_t y, const char c, const uint8_t *font, uint
 					const char frame = font[ch_offset++];
 					for(int8_t i = 0; i < 8; i++)
 					{
-						sh1107_pixel(x + (8 - 1) - i, y + (font[1] - 1) - j,
+						sh1107_pixel(x + (8 - 1) - i + k * 8, y + (font[1] - 1) - j,
 									 !!(frame & (1 << i)) ^ invert);
 					}
 				}

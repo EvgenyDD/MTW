@@ -149,7 +149,7 @@ float utils_interpolate_angles_rad(float a1, float a2, float weight_a1)
 		a1 += 2.0 * M_PI;
 
 	float res = a1 * weight_a1 + a2 * (1.0 - weight_a1);
-	utils_norm_angle_rad(&res);
+	res = utils_norm_angle_rad(res);
 	return res;
 }
 
@@ -390,18 +390,14 @@ void utils_fast_sincos(float angle, float *sin, float *cos)
  * @param cos
  * A pointer to store the cosine value.
  */
-void utils_fast_sincos_better(float angle, float *sin, float *cos)
+void utils_fast_sincos_better(float angle, volatile float *sin, volatile float *cos)
 {
 	// always wrap input angle to -PI..PI
 	while(angle < -M_PI)
-	{
 		angle += 2.0 * M_PI;
-	}
 
 	while(angle > M_PI)
-	{
 		angle -= 2.0 * M_PI;
-	}
 
 	// compute sine
 	if(angle < 0.0)
@@ -433,37 +429,41 @@ void utils_fast_sincos_better(float angle, float *sin, float *cos)
 
 	// compute cosine: sin(x + PI/2) = cos(x)
 	angle += 0.5 * M_PI;
-	if(angle > M_PI)
-	{
-		angle -= 2.0 * M_PI;
-	}
+	if(angle > M_PI) angle -= 2.0 * M_PI;
 
 	if(angle < 0.0)
 	{
 		*cos = 1.27323954 * angle + 0.405284735 * angle * angle;
 
 		if(*cos < 0.0)
-		{
 			*cos = 0.225 * (*cos * -*cos - *cos) + *cos;
-		}
 		else
-		{
 			*cos = 0.225 * (*cos * *cos - *cos) + *cos;
-		}
 	}
 	else
 	{
 		*cos = 1.27323954 * angle - 0.405284735 * angle * angle;
 
 		if(*cos < 0.0)
-		{
 			*cos = 0.225 * (*cos * -*cos - *cos) + *cos;
-		}
 		else
-		{
 			*cos = 0.225 * (*cos * *cos - *cos) + *cos;
-		}
 	}
+}
+
+float _isqrt_q3a_(float number)
+{
+	const float x2 = number * 0.5F;
+	const float threehalfs = 1.5F;
+
+	union
+	{
+		float f;
+		uint32_t i;
+	} conv = {number};
+	conv.i = 0x5f3759df - (conv.i >> 1);
+	conv.f *= (threehalfs - (x2 * conv.f * conv.f));
+	return conv.f;
 }
 
 /**

@@ -1,5 +1,6 @@
 #include "adc.h"
 #include "stm32f4xx.h"
+#include "utils_math.h"
 
 #define NTC_COEF 3434.0f
 // NTC -> lo side
@@ -75,7 +76,7 @@ void adc_init(void)
 	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Falling;
 	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_CC2;
 	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	ADC_InitStructure.ADC_NbrOfConversion = 3;
+	ADC_InitStructure.ADC_NbrOfConversion = 4;
 
 	ADC_Init(ADC1, &ADC_InitStructure);
 	ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
@@ -97,6 +98,10 @@ void adc_init(void)
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_Vrefint, rank, ADC_SampleTime_112Cycles);
 	ADC_RegularChannelConfig(ADC2, ADC_Channel_0, rank, ADC_SampleTime_112Cycles); // dummy
 	ADC_RegularChannelConfig(ADC3, ADC_Channel_0, rank, ADC_SampleTime_112Cycles); // dummy
+	rank++;
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_6, rank, ADC_SampleTime_112Cycles);
+	ADC_RegularChannelConfig(ADC2, ADC_Channel_7, rank, ADC_SampleTime_112Cycles);
+	ADC_RegularChannelConfig(ADC3, ADC_Channel_0, rank, ADC_SampleTime_112Cycles); // dummy
 
 	adcVREFINTCAL = *(uint16_t *)VREFINT_CAL_ADDR;
 	adcTSCAL1 = *(uint16_t *)TS_CAL1_ADDR;
@@ -111,14 +116,18 @@ void adc_init(void)
 
 void adc_conv_val(void)
 {
-	g_adc_val.i_raw[0] = g_adc_buffer[ADC_CH_I1];
-	g_adc_val.i_raw[1] = g_adc_buffer[ADC_CH_I2];
+	g_adc_val.i[0] = (float)((4095 - g_adc_buffer[ADC_CH_I0]) - 2048) * ADC_I_SCALE;//
+	g_adc_val.i[1] = (float)((4095 - g_adc_buffer[ADC_CH_I1]) - 2048) * ADC_I_SCALE;
 
-	g_adc_val.i[0] = (float)(g_adc_buffer[ADC_CH_I1] - 2048) * ADC_I_SCALE;
-	g_adc_val.i[1] = (float)(g_adc_buffer[ADC_CH_I2] - 2048) * ADC_I_SCALE;
+	g_adc_val.hall_raw[0] = g_adc_buffer[ADC_CH_HALL0];
+	g_adc_val.hall_raw[1] = g_adc_buffer[ADC_CH_HALL1];
+
 	g_adc_val.ub = (float)g_adc_buffer[ADC_CH_UB] * ADC_UB_SCALE;
 
 	g_adc_val.tmtr = NTC_TEMP_LO_SIDE(g_adc_buffer[ADC_CH_TEMP_MTR], NTC_COEF);
 	g_adc_val.tinv = NTC_TEMP_LO_SIDE(g_adc_buffer[ADC_CH_TEMP_INV], NTC_COEF);
 	g_adc_val.tcpu = ((float)g_adc_buffer[ADC_CH_TEMP_CPU] * adcVREFINTCAL / (float)g_adc_buffer[ADC_CH_INTREF] - adcTSCAL1) * adcTSSlopeK + 30.0f;
+	UTILS_NAN_ZERO(g_adc_val.tmtr);
+	UTILS_NAN_ZERO(g_adc_val.tinv);
+	UTILS_NAN_ZERO(g_adc_val.tcpu);
 }

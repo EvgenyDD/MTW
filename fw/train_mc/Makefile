@@ -32,34 +32,43 @@ EXT_LIBS +=c m nosys
 PPDEFS += USE_STDPERIPH_DRIVER STM32F40_41xxx STM32F407xx HSE_VALUE=8000000 FW_TYPE=FW_APP CFG_SYSTEM_SAVES_NON_NATIVE_DATA=1 DEV=\"RWMC\"
 PPDEFS += USBD_CLASS_COMPOSITE_DFU_CDC
 PPDEFS += DFU_READS_CFG_SECTION
+PPDEFS += DCC_SELF_ID=1
+# PPDEFS += DBG_STM
 
 INCDIR += app
 INCDIR += app/drive
+INCDIR += app/led
 INCDIR += common
 INCDIR += common/CMSIS
 INCDIR += common/config_system
 INCDIR += common/console
 INCDIR += common/crc
 INCDIR += common/fw_header
+INCDIR += common/i2c
 INCDIR += common/md5
 INCDIR += common/STM32_USB_Device_Library/Core
 INCDIR += common/STM32_USB_OTG_Driver
 INCDIR += common/STM32F4xx_StdPeriph_Driver/inc
 INCDIR += common/usb
+INCDIR += ../dcc
 
-SOURCES += $(call rwildcard, app, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/adc, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/CMSIS, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/config_system, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/console, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/crc, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/fw_header, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/md5, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/STM32_USB_Device_Library/Core, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/STM32_USB_OTG_Driver, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/STM32F4xx_StdPeriph_Driver, *.c *.S *.s)
-SOURCES += $(call rwildcard, common/usb, *.c *.S *.s)
+SOURCES += $(wildcard app/*.c)
+SOURCES += $(wildcard app/drive/*.c)
+SOURCES += $(wildcard app/led/*.c)
+SOURCES += $(wildcard common/adc/*.c)
+SOURCES += $(wildcard common/CMSIS/*.s)
+SOURCES += $(wildcard common/config_system/*.c)
+SOURCES += $(wildcard common/console/*.c)
+SOURCES += $(wildcard common/crc/*.c)
+SOURCES += $(wildcard common/fw_header/*.c)
+SOURCES += $(wildcard common/i2c/*.c)
+SOURCES += $(wildcard common/md5/*.c)
+SOURCES += $(wildcard common/STM32_USB_Device_Library/Core/*.c)
+SOURCES += $(wildcard common/STM32_USB_OTG_Driver/*.c)
+SOURCES += $(wildcard common/STM32F4xx_StdPeriph_Driver/src/*.c)
+SOURCES += $(wildcard common/usb/*.c)
 SOURCES += $(wildcard common/*.c)
+SOURCES += $(wildcard ../dcc/*.c)
 LDSCRIPT += ldscript/app.ld
 
 BINARY_SIGNED = $(BUILDDIR)/$(EXE_NAME)_app_signed.bin

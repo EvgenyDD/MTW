@@ -1,15 +1,20 @@
 #include "console.h"
+#include "dcc.h"
 #include "esp_ota_ops.h"
+#include "ina226.h"
+#include "sh1107.h"
 
-// void _a(print_func_t pf, const char *req, int len, int *ret)
-// {
-// 	while(*req == ' ' || *req == '+')
-// 		req++;
-// 	int value = atoi(req);
-// 	pf("set to val %d", value);
-// 	mode = value;
-// 	mode_ch = 1;
-// }
+extern void dcc_diag(print_func_t pf);
+
+void con_diag(print_func_t pf, const char *req, int len, int *ret)
+{
+	dcc_diag(pf);
+}
+
+void con_ina(print_func_t pf, const char *req, int len, int *ret)
+{
+	ina226_trace(pf);
+}
 
 const console_cmd_t console_cmd[] = {
 	{"info", con_cb_info},
@@ -24,6 +29,8 @@ const console_cmd_t console_cmd[] = {
 	{"partitions", con_cb_partitions_info},
 	{"switch_partitions", con_cb_partitions_switch},
 	{"approve", con_cb_fw_approve},
+	{"diag", con_diag},
+	{"ina", con_ina},
 	//--------------------------------
 	//--------------------------------
 };

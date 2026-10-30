@@ -49,13 +49,17 @@ void drv_init(void)
 	GPIO_InitTypeDef GPIO_InitStructure = {0};
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_10; // PWM - H
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;						 // temporary out to disable PWM outputs during init
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIOA->BSRRH = GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_10;
 
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15; // PWM - L
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;						   // temporary out to disable PWM outputs during init
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIOB->BSRRH = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
 
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_TIM1);
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_TIM1);
@@ -82,9 +86,13 @@ void drv_init(void)
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13; // FAULT
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1; // ADC
+	// ADC
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_4; // ADC
@@ -122,8 +130,8 @@ void drv_init(void)
 	// DMA_ITConfig(DMA2_Stream4, DMA_IT_TC, ENABLE);
 
 	NVIC_InitTypeDef NVIC_InitStructure;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_InitStructure.NVIC_IRQChannel = DMA2_Stream4_IRQn;
 	NVIC_Init(&NVIC_InitStructure);
@@ -138,7 +146,7 @@ void drv_init(void)
 	TIM_TimeBaseStructure.TIM_Period = HALF_CORE_CLOCK / ((uint32_t)frequency) - 1;
 	TIM_TimeBaseStructure.TIM_ClockDivision = 0;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_CenterAligned1;
-	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
+	TIM_TimeBaseStructure.TIM_RepetitionCounter = 1; //enter irq every N time
 	TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
 
 	ctrl.pwm_freq = frequency;
@@ -215,6 +223,16 @@ void drv_init(void)
 
 	drv_pwm_off();
 
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_10; // PWM - H
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15; // PWM - L
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15; // DC_CAL
@@ -224,9 +242,12 @@ void drv_init(void)
 
 	TIM_ITConfig(TIM2, TIM_IT_CC2, ENABLE); // Enable CC2 interrupt, which will be fired in V0 and V7
 
-	__NVIC_SetPriority(TIM2_IRQn, 6);
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
+	NVIC_Init(&NVIC_InitStructure);
 	__NVIC_ClearPendingIRQ(TIM2_IRQn);
-	__NVIC_EnableIRQ(TIM2_IRQn);
 
 	ctrl.init_done = true;
 
@@ -235,4 +256,12 @@ void drv_init(void)
 	EN_GATE_ON();
 }
 
-#warning "heal deadtime"
+void drv_upd_deadtime_ns(float dt)
+{
+	ctrl.err = 0xFF;
+	ctrl.pwm_on = false;
+	drv_pwm_off();
+	uint8_t DTG = calculate_deadtime(dt, SYSTEM_CORE_CLOCK);
+	TIM1->BDTR = (TIM1->BDTR & (~TIM_BDTR_DTG)) | DTG;
+	TIM_GenerateEvent(TIM1, TIM_EventSource_Update);
+}
